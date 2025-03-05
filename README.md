@@ -21,6 +21,6 @@ This project is a full-stack application that manages student information, allow
 
 First, clone the repository to your local machine:
 
-```bash
-git clone https://github.com/your-username/your-repository-name.git
-cd your-repository-name
+```bash[
+git clone https://github.com/chraietrayen/gestion_etudiant_python.git
+cd gestion_etudiant_python.git
