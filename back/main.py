@@ -4,30 +4,35 @@ from pydantic import BaseModel
 from typing import List
 import sqlite3
 
+# Création de l'instance FastAPI
 app = FastAPI()
 
-# CORS Middleware
+# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic model for student data
+# Modèle Pydantic pour Student
 class Student(BaseModel):
     name: str
     age: int
     grade: str
 
-# SQLite DB connection
+# Modèle pour inclure l'ID dans la réponse
+class StudentResponse(Student):
+    id: int
+
+# Fonction pour obtenir la connexion à la base de données
 def get_db():
     conn = sqlite3.connect("students.db")
-    conn.row_factory = sqlite3.Row  # Fetch rows as dictionaries
+    conn.row_factory = sqlite3.Row  # Permet de récupérer les résultats sous forme de dictionnaire
     return conn
 
-# Create students table if not exists
+# Création de la table si elle n'existe pas
 def create_table():
     conn = get_db()
     cursor = conn.cursor()
@@ -42,30 +47,33 @@ def create_table():
     conn.commit()
     conn.close()
 
+# Appel de la fonction pour s'assurer que la table existe
 create_table()
 
+# Endpoint racine
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Student API!"}
 
-# POST request to add student
+# Ajouter un étudiant
 @app.post("/students/")
 def add_student(student: Student):
     try:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO students (name, age, grade) VALUES (?, ?, ?)", 
+            "INSERT INTO students (name, age, grade) VALUES (?, ?, ?)",
             (student.name, student.age, student.grade)
         )
         conn.commit()
+        student_id = cursor.lastrowid  # Récupérer l'ID généré
         conn.close()
-        return {"message": "Student added successfully"}
+        return {"message": "Student added successfully", "id": student_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# GET request to fetch all students
-@app.get("/students/", response_model=List[Student])
+# Récupérer tous les étudiants
+@app.get("/students/", response_model=List[StudentResponse])
 def get_students():
     try:
         conn = get_db()
@@ -73,14 +81,11 @@ def get_students():
         cursor.execute("SELECT * FROM students")
         students = cursor.fetchall()
         conn.close()
-        return [
-            {"id": row["id"], "name": row["name"], "age": row["age"], "grade": row["grade"]}
-            for row in students
-        ]
+        return [{"id": row["id"], "name": row["name"], "age": row["age"], "grade": row["grade"]} for row in students]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# DELETE request to remove student by ID
+# Supprimer un étudiant par ID
 @app.delete("/students/{student_id}")
 def delete_student(student_id: int):
     try:
@@ -88,8 +93,7 @@ def delete_student(student_id: int):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM students WHERE id = ?", (student_id,))
         conn.commit()
-
-        # Check if student exists
+        
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Student not found")
 
